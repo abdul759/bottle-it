@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;600;700&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", "Georgia", serif;
+  
+  --color-brand-primary: #6B705C;
+  --color-brand-secondary: #A5A58D;
+  --color-brand-accent: #B7B7A4;
+  --color-brand-accepted: #88A070;
+  --color-brand-bg: #F2F0E9;
+  --color-brand-text: #3D405B;
+}
+
+:root {
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-text);
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Html5QrcodeScanner Overrides */
+#qr-reader {
+  border: none !important;
+  background: #1a1a1a !important;
+}
+
+#qr-reader__dashboard {
+  background: transparent !important;
+  color: white !important;
+  padding: 20px !important;
+}
+
+#qr-reader__status_span {
+  display: none !important;
+}
+
+#qr-reader__scan_region {
+  padding: 0 !important;
+}
+
+#qr-reader img {
+  display: none !important;
+}
+
+#qr-reader__dashboard_section_csr button {
+  background: #6B705C !important;
+  color: white !important;
+  border: none !important;
+  padding: 12px 24px !important;
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  box-shadow: 0 10px 15px -3px rgba(107, 112, 92, 0.4) !important;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #A5A58D;
+  border-radius: 10px;
+}
+

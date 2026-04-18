@@ -1,0 +1,9 @@
+{
+  "name": "Bottle It",
+  "description": "Scan barcodes to instantly check recycling eligibility and track your ecological impact.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
