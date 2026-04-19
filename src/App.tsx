@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Camera, 
+  Search,
   History, 
   Leaf, 
   Info, 
@@ -12,7 +13,12 @@ import {
   AlertTriangle,
   MapPin,
   Navigation,
-  Quote
+  Quote,
+  Loader2,
+  Clock,
+  ExternalLink,
+  MessageSquare,
+  Globe
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { 
@@ -41,23 +47,126 @@ export default function App() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
   const [mapZoom, setMapZoom] = useState(12);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<any | null>(null);
 
   const DEPOSIT_LOCATIONS = [
-    { id: 'bulk-1', name: "Bulk: 45 St James Pl", address: "Lower Manhattan", status: "Open", type: 'bulk', lat: 40.7126, lng: -73.9984 },
-    { id: 'bulk-2', name: "Bulk: 219 McKibbin St", address: "Brooklyn", status: "Open", type: 'bulk', lat: 40.7051, lng: -73.9372 },
-    { id: 'bulk-3', name: "Bulk: 41-05 37th St", address: "LIC", status: "Open", type: 'bulk', lat: 40.7516, lng: -73.9272 },
-    { id: 'bulk-4', name: "Bulk: 34-31 38th St", address: "Astoria", status: "Open", type: 'bulk', lat: 40.7548, lng: -73.9238 },
-    { id: 'wf-1', name: "WF: 808 Columbus Ave", address: "Manhattan (UWS)", status: "Open", type: 'retail', lat: 40.7964, lng: -73.9663 },
-    { id: 'wf-2', name: "WF: 1551 3rd Ave", address: "Manhattan (UES)", status: "Open", type: 'retail', lat: 40.7801, lng: -73.9547 },
-    { id: 'wf-3', name: "WF: 1175 3rd Ave", address: "Manhattan (UES)", status: "Open", type: 'retail', lat: 40.7674, lng: -73.9624 },
-    { id: 'wf-4', name: "WF: 10 Columbus Cir", address: "Manhattan", status: "Open", type: 'retail', lat: 40.7681, lng: -73.9822 },
-    { id: 'wf-5', name: "WF: 301 W 50th St", address: "Manhattan", status: "Open", type: 'retail', lat: 40.7621, lng: -73.9877 },
-    { id: 'wf-6', name: "WF: 226 E 57th St", address: "Manhattan", status: "Open", type: 'retail', lat: 40.7600, lng: -73.9669 }
+    { 
+      id: 'wf-fidi', 
+      name: "WF: 66 Broadway", 
+      address: "Financial District", 
+      status: "Open", 
+      type: 'retail', 
+      lat: 40.7073, 
+      lng: -74.0121,
+      hours: "7:00 AM - 10:00 PM",
+      website: "https://www.wholefoodsmarket.com/stores/onewallstreet",
+      tips: "Self-service internal machines are located near the Broadway entrance."
+    },
+    { 
+      id: 'wf-union', 
+      name: "WF: 4 Union Sq E", 
+      address: "Union Square", 
+      status: "Open", 
+      type: 'retail', 
+      lat: 40.7347, 
+      lng: -73.9904,
+      hours: "7:00 AM - 10:00 PM",
+      website: "https://www.wholefoodsmarket.com/stores/unionsquare",
+      tips: "One of the busiest locations. Try to go during off-peak hours (before 10 AM)."
+    },
+    { 
+      id: 'wf-bryant', 
+      name: "WF: 1095 6th Ave", 
+      address: "Midtown / Bryant Park", 
+      status: "Open", 
+      type: 'retail', 
+      lat: 40.7552, 
+      lng: -73.9845,
+      hours: "7:00 AM - 10:00 PM",
+      website: "https://www.wholefoodsmarket.com/stores/bryantpark",
+      tips: "Midtown office workers use this frequently. Machines are well-maintained."
+    },
+    { 
+      id: 'wf-ues-87', 
+      name: "WF: 1551 3rd Ave", 
+      address: "UES / 87th St", 
+      status: "Open", 
+      type: 'retail', 
+      lat: 40.7797, 
+      lng: -73.9549,
+      hours: "7:00 AM - 10:00 PM",
+      website: "https://www.wholefoodsmarket.com/stores/upper-east-side",
+      tips: "Great stock, but machines can fill up quickly on weekends."
+    },
+    { 
+      id: 'wf-ues-69', 
+      name: "WF: 1175 3rd Ave", 
+      address: "Lenox Hill / 69th St", 
+      status: "Open", 
+      type: 'retail', 
+      lat: 40.7674, 
+      lng: -73.9624,
+      hours: "7:00 AM - 10:00 PM",
+      website: "https://www.wholefoodsmarket.com/stores/69thstreet",
+      tips: "Compact store, easy to navigate if you have just a few returns."
+    }
   ];
 
-  const focusLocation = (lat: number, lng: number) => {
+  const focusLocation = (lat: number, lng: number, location?: any) => {
     setMapCenter({ lat, lng });
     setMapZoom(16);
+    if (location) setSelectedLocation(location);
+  };
+
+  const handleStoreSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim() || !process.env.GEMINI_API_KEY) return;
+
+    setIsSearching(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Find 5 ${searchQuery} locations in New York City that would likely accept bottle deposits (supermarkets, big box stores).
+      Return ONLY a JSON array of objects:
+      [
+        {
+          "id": "string",
+          "name": "string",
+          "address": "string",
+          "status": "Open",
+          "type": "retail",
+          "lat": number,
+          "lng": number,
+          "hours": "7 AM - 10 PM",
+          "website": "URL",
+          "tips": "Brief tip about returns"
+        }
+      ]
+      Focus on specialized Manhattan/Brooklyn locations if the query is general. 
+      Ensure lat/lng are accurate NYC coordinates.`;
+
+      const result = await (ai as any).models.generateContent({
+        model: AI_MODEL,
+        contents: prompt
+      });
+      const text = result.text;
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      
+      if (jsonMatch) {
+        const locations = JSON.parse(jsonMatch[0]);
+        setSearchResults(locations);
+        if (locations.length > 0) {
+          focusLocation(locations[0].lat, locations[0].lng);
+        }
+      }
+    } catch (error) {
+      console.error("Store search failed:", error);
+    } finally {
+      setIsSearching(false);
+    }
   };
   useEffect(() => {
     const saved = localStorage.getItem('rescan_history');
@@ -159,35 +268,55 @@ export default function App() {
     let product: Product | null = null;
 
     try {
-      // 1. Try local API (static database)
-      const response = await fetch(`/api/lookup/${barcode}`);
-      if (response.ok) {
-        product = await response.json();
+      // 1. Direct Local Sync Lookup (Instant)
+      if (BOTTLE_DATABASE[barcode]) {
+        product = BOTTLE_DATABASE[barcode];
       } else {
         // 2. High-speed Fallback: Open Food Facts
-        const offResponse = await fetch(
-          `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-          { signal: (AbortSignal as any).timeout?.(3000) } // Prevent UI freeze
-        );
-        const offData = await offResponse.json();
-
-        if (offData.status === 1 && offData.product) {
-          const offProduct = offData.product;
-          const isBeverage = offProduct.categories_tags?.some((c: string) => 
-            c.includes('beverages') || c.includes('drinks')
-          );
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
-          product = {
-            barcode,
-            name: offProduct.product_name || `Item #${barcode.slice(-4)}`,
-            brand: offProduct.brands || "Unknown Brand",
-            type: isBeverage ? 'Plastic' : 'Other', // General assumption for food/bev
-            accepted: !!isBeverage,
-            value: isBeverage ? 0.05 : 0,
-            instructions: isBeverage ? "NYC Deposit Eligible. Check for 5¢ mark." : "Check packaging for recycling symbols."
-          };
-        } else if (process.env.GEMINI_API_KEY) {
-          // 3. Last Fallback: AI Deep Research
+          const offResponse = await fetch(
+            `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+            { signal: controller.signal }
+          ).finally(() => clearTimeout(timeoutId));
+          
+          if (offResponse.ok) {
+            const offData = await offResponse.json();
+            if (offData.status === 1 && offData.product) {
+              const offProduct = offData.product;
+              const isBeverage = offProduct.categories_tags?.some((c: string) => 
+                c.includes('beverages') || c.includes('drinks')
+              );
+              
+              const name = offProduct.product_name || "";
+              const pName = name.toLowerCase();
+              const packaging = (offProduct.packaging || "").toLowerCase();
+              const isCan = pName.includes("can") || 
+                            packaging.includes("can") || 
+                            packaging.includes("aluminum") ||
+                            pName.includes("celsius") || 
+                            pName.includes("red bull") ||
+                            pName.includes("energy drink");
+
+              product = {
+                barcode,
+                name: name || `Item #${barcode.slice(-4)}`,
+                brand: offProduct.brands || "Unknown Brand",
+                type: isBeverage ? (isCan ? 'Aluminum' : 'Plastic') : 'Other', 
+                accepted: !!isBeverage,
+                value: isBeverage ? 0.05 : 0,
+                instructions: isBeverage ? `NYC Deposit Eligible. ${isCan ? 'Aluminum Can' : 'Check for 5¢ mark'}.` : "Check packaging for recycling symbols."
+              };
+            }
+          }
+        } catch (apiError) {
+          console.warn("External API lookup failed or timed out:", apiError);
+        }
+
+        // 3. Last Fallback: AI Deep Research (Only if still null)
+        if (!product && process.env.GEMINI_API_KEY) {
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
           const model = ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -208,12 +337,12 @@ export default function App() {
         }
       }
     } catch (error) {
-      console.error("Lookup failed:", error);
+      console.error("Lookup main logic failed:", error);
     }
 
-    // 3. Last fallback
+    // Final fallback for purely offline/error states
     if (!product) {
-      product = BOTTLE_DATABASE[barcode] || {
+      product = {
         barcode,
         name: `Item #${barcode.slice(-4)}`,
         brand: "Unknown Brand",
@@ -493,14 +622,30 @@ export default function App() {
                       mapId={MAP_ID}
                       className="w-full h-full"
                     >
+                      {/* Static Verified Locations */}
                       {DEPOSIT_LOCATIONS.map(loc => (
                         <AdvancedMarker 
                           key={loc.id} 
                           position={{ lat: loc.lat, lng: loc.lng }}
-                          onClick={() => focusLocation(loc.lat, loc.lng)}
+                          onClick={() => focusLocation(loc.lat, loc.lng, loc)}
                         >
                           <Pin 
-                            background={loc.type === 'bulk' ? '#88A070' : '#6B705C'} 
+                            background={'#88A070'} 
+                            glyphColor={'#FFF'} 
+                            borderColor={'#000'} 
+                          />
+                        </AdvancedMarker>
+                      ))}
+
+                      {/* Search Results */}
+                      {searchResults.map(loc => (
+                        <AdvancedMarker 
+                          key={loc.id} 
+                          position={{ lat: loc.lat, lng: loc.lng }}
+                          onClick={() => focusLocation(loc.lat, loc.lng, loc)}
+                        >
+                          <Pin 
+                            background={'#6B705C'} 
                             glyphColor={'#FFF'} 
                             borderColor={'#000'} 
                           />
@@ -519,21 +664,40 @@ export default function App() {
                 )}
               </div>
 
+              <form onSubmit={handleStoreSearch} className="px-2 relative">
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search stores (Whole Foods, Target...)"
+                  className="w-full bg-white border border-brand-accent/20 rounded-2xl py-4 px-6 pr-12 text-sm font-bold text-brand-text placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 transition-all shadow-sm"
+                />
+                <button 
+                  type="submit"
+                  disabled={isSearching}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-brand-primary hover:scale-110 transition-transform disabled:opacity-50"
+                >
+                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                </button>
+              </form>
+
               <div className="space-y-3">
-                <h4 className="font-black text-brand-text text-[10px] uppercase tracking-[0.2em] px-2 opacity-50">Nearby Centers</h4>
+                <h4 className="font-black text-brand-text text-[10px] uppercase tracking-[0.2em] px-2 opacity-50">
+                  {searchResults.length > 0 ? "Search Results" : "Nearby Centers"}
+                </h4>
                 <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar px-1">
-                  {DEPOSIT_LOCATIONS.map((place) => (
+                  {(searchResults.length > 0 ? searchResults : DEPOSIT_LOCATIONS).map((place) => (
                     <button 
                       key={place.id} 
-                      onClick={() => focusLocation(place.lat, place.lng)}
+                      onClick={() => focusLocation(place.lat, place.lng, place)}
                       className="w-full text-left bg-white p-4 rounded-2xl flex items-center justify-between border border-gray-100 shadow-sm active:scale-[0.98] transition-transform hover:border-brand-primary"
                     >
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "w-10 h-10 rounded-xl flex items-center justify-center",
-                          place.type === 'bulk' ? "bg-brand-primary text-white" : "bg-brand-bg text-brand-primary"
+                          searchResults.length > 0 ? "bg-brand-bg text-brand-primary" : "bg-brand-primary text-white"
                         )}>
-                          {place.type === 'bulk' ? <Trash2 className="w-5 h-5" /> : <Navigation className="w-5 h-5" />}
+                          {searchResults.length > 0 ? <Navigation className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
                         </div>
                         <div>
                           <p className="font-bold text-brand-text text-sm tracking-tight">{place.name}</p>
@@ -543,8 +707,88 @@ export default function App() {
                       <ChevronRight className="w-5 h-5 text-brand-accent/40" />
                     </button>
                   ))}
+                  {searchResults.length === 0 && DEPOSIT_LOCATIONS.length === 0 && (
+                    <div className="text-center py-8 opacity-40">
+                      <MapPin className="w-8 h-8 mx-auto mb-2" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">Enter a store name above</p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Location Detail Overlay */}
+              <AnimatePresence>
+                {selectedLocation && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 100 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 100 }}
+                    className="absolute inset-x-0 bottom-0 z-30 p-4"
+                  >
+                    <div className="bg-white rounded-[40px] shadow-2xl border border-brand-accent/10 p-6 relative overflow-hidden">
+                      <button 
+                        onClick={() => setSelectedLocation(null)}
+                        className="absolute right-6 top-6 p-2 bg-brand-bg rounded-full text-brand-secondary hover:text-brand-text transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+
+                      <div className="space-y-6">
+                        <div className="flex items-start gap-4 pr-10">
+                          <div className="w-14 h-14 rounded-3xl bg-brand-primary flex items-center justify-center text-white shrink-0">
+                            <MapPin className="w-7 h-7" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-brand-text italic font-serif leading-tight">{selectedLocation.name}</h3>
+                            <p className="text-xs text-brand-secondary font-bold uppercase tracking-tight mt-1">{selectedLocation.address}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-brand-bg/50 rounded-2xl p-4 border border-brand-accent/5">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Clock className="w-3 h-3 text-brand-primary" />
+                              <span className="text-[9px] font-black uppercase tracking-widest text-brand-secondary">Hours</span>
+                            </div>
+                            <p className="text-xs font-bold text-brand-text">{selectedLocation.hours || "Consult store website"}</p>
+                          </div>
+                          <a 
+                            href={selectedLocation.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-brand-primary/5 rounded-2xl p-4 border border-brand-primary/10 flex flex-col justify-center group active:scale-95 transition-transform"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <Globe className="w-3 h-3 text-brand-primary" />
+                              <span className="text-[9px] font-black uppercase tracking-widest text-brand-secondary">Website</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-brand-primary italic font-serif underline decoration-brand-primary/20">Visit Store</span>
+                              <ExternalLink className="w-3 h-3 text-brand-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                            </div>
+                          </a>
+                        </div>
+
+                        {selectedLocation.tips && (
+                          <div className="bg-brand-accepted/5 rounded-2xl p-4 border border-brand-accepted/10">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageSquare className="w-3 h-3 text-brand-accepted" />
+                              <span className="text-[9px] font-black uppercase tracking-widest text-brand-accepted">Community Tip</span>
+                            </div>
+                            <p className="text-xs text-brand-text leading-relaxed italic font-medium">"{selectedLocation.tips}"</p>
+                          </div>
+                        )}
+                        
+                        {!selectedLocation.tips && (
+                          <div className="py-4 text-center border-t border-brand-bg">
+                            <p className="text-[10px] text-brand-secondary font-bold uppercase tracking-widest opacity-40 italic">No community tips yet</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>

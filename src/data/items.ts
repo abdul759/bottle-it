@@ -81,5 +81,14 @@ export const BOTTLE_DATABASE: Record<string, Product> = {
     accepted: false,
     value: 0,
     instructions: "Soft plastic film is usually not accepted in curbside bins. Check store drop-offs."
+  },
+  "852425000923": {
+    barcode: "852425000923",
+    name: "CELSIUS Peach Vibe Sparkling White Peach",
+    brand: "CELSIUS",
+    type: "Aluminum",
+    accepted: true,
+    value: 0.05,
+    instructions: "NYC Deposit Eligible. This is an aluminum can. 100% infinitely recyclable."
   }
 };
