@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+            {
+                "type": "node",
+            "request": "launch",
+            "name": "Debug server.ts (tsx)",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx", "server.ts"],
+            "cwd": "${workspaceFolder}",
+            "env": { "NODE_ENV": "development" },
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen"
+        },
+            {
+                "type": "chrome",
+            "request": "launch",
+            "name": "Open in Browser",
+            "url": "${input:appUrl}",
+            "webRoot": "${workspaceFolder}"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run Dev Server + Open Browser",
+            "configurations": ["Debug server.ts (tsx)", "Open in Browser"]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "appUrl",
+            "type": "promptString",
+            "description": "URL to open in the browser (e.g. http://localhost:5173)"
+        }
+    ]
+}
